@@ -1,15 +1,20 @@
 "use client";
 import { useEffect, useId, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { CatalogItem } from "@/lib/data";
 import { IMPORT_LIMITS, parseImportCsv, parsePasted, type ImportError } from "@/lib/csv";
 import type { ImportResult } from "@/lib/import/service";
 import { DIMENSIONS } from "@/lib/types";
 import { DIMENSION_LABEL, SENTIMENT_LABEL, SENTIMENT_SYMBOL } from "@/lib/labels";
 import { IconAlert, IconCheck, IconFlask, IconInfo } from "./Icons";
+import { dataset } from "@/lib/data";
+import { cleanImportLocally, customPhone } from "@/lib/import/local";
+import { BACKEND_ENABLED, apiUrl, withBase } from "@/lib/runtime";
 
 const CUSTOM = "__custom__";
 
-export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; initialName: string }) {
+export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
+  const initialName = (useSearchParams().get("name") ?? "").replace(/[\u0000-\u001f<>]/g, "").slice(0, 40);
   const [phone, setPhone] = useState<string>(initialName ? CUSTOM : catalog[0]?.id ?? CUSTOM);
   const [outside, setOutside] = useState(initialName);
   const [format, setFormat] = useState<"paste" | "csv">("paste");
@@ -25,11 +30,16 @@ export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; i
   const ids = { phone: useId(), outside: useId(), text: useId(), file: useId(), source: useId(), consent: useId(), err: useId() };
 
   useEffect(() => {
-    fetch("/api/status")
+    if (!BACKEND_ENABLED) {
+      setAiStatus({ ai: false, fixture: false });
+      return;
+    }
+    fetch(apiUrl("/api/status"))
       .then((r) => r.json())
       .then((d) => setAiStatus({ ai: !!d.ai, fixture: !!d.fixture }))
       .catch(() => setAiStatus({ ai: false, fixture: false }));
   }, []);
+  const remote = !!aiStatus?.ai;
 
   const phoneId = phone === CUSTOM ? "custom" : phone;
 
@@ -52,8 +62,19 @@ export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; i
     }
     setBusy(true);
     setResult(null);
+    if (!remote) {
+      // 静态版本：解析、去重与可疑项标记在本机浏览器完成，不上传
+      await new Promise((r) => setTimeout(r, 120));
+      const parsed = format === "csv" ? parseImportCsv(content, new Set([phoneId])) : parsePasted(content, phoneId, source);
+      const rec = phone === CUSTOM ? customPhone(outside) : dataset.phones.find((p) => p.id === phone)!;
+      setResult(
+        cleanImportLocally(parsed.rows, rec, phone !== CUSTOM, dataset.phones, "已在你的浏览器中完成清洗与去重。维度分析需要 AI 后端，当前暂未启用。"),
+      );
+      setBusy(false);
+      return;
+    }
     try {
-      const r = await fetch("/api/import", {
+      const r = await fetch(apiUrl("/api/import"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -143,7 +164,7 @@ export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; i
                 <p className="field-hint">
                   必填列 phone_id、text、source_label；可选 review_id、review_date、system_version、source_url。phone_id 需填
                   <code className="mono"> {phoneId} </code>。
-                  <a href="/templates/reviews_template.csv" download>
+                  <a href={withBase("/templates/reviews_template.csv")} download>
                     下载模板
                   </a>
                   {fileName ? ` · 已读取 ${fileName}` : ""}
@@ -179,7 +200,7 @@ export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; i
             <span className="box" aria-hidden="true" style={{ marginTop: 4 }}>
               <IconCheck size={11} />
             </span>
-            <span>我确认有权提交这些文本，并知道它们会发送给已配置的模型服务做维度分析。</span>
+            <span>{remote ? "我确认有权提交这些文本，并知道它们会发送给已配置的模型服务做维度分析。" : "我确认有权使用这些文本（静态版本只在本机浏览器处理，不会上传）。"}</span>
           </label>
           <div id={`${ids.consent}-msg`}>
             {consentErr && (
@@ -208,11 +229,20 @@ export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; i
             <IconInfo /> 你的文本会怎样处理
           </h2>
           <ul className="note-list" style={{ marginTop: 0 }}>
-            <li>先在服务端去重、识别广告与机型混入，再把通过清洗的文本发送给已配置的模型服务，按六个固定维度提取标签。</li>
-            <li>只用于本次分析：不写入公共目录，不进入公共缓存，应用日志不保存原文。</li>
-            <li>导入样本与内置样本分开统计，不混在一起计算比例。</li>
+            {remote ? (
+              <>
+                <li>先在服务端去重、识别广告与机型混入，再把通过清洗的文本发送给已配置的模型服务，按六个固定维度提取标签。</li>
+                <li>只用于本次分析：不写入公共目录，不进入公共缓存，应用日志不保存原文。</li>
+                <li>模型服务商自身的数据保留规则需要以其公开政策为准。</li>
+              </>
+            ) : (
+              <>
+                <li>解析、去重、广告与机型混入识别都在你的浏览器中完成，文本不会上传到任何服务器。</li>
+                <li>按续航、发热等维度提取标签需要 AI 后端，当前暂未启用，所以结果里的维度统计为空。</li>
+              </>
+            )}
+            <li>导入样本与内置样本分开统计，不混在一起计算比例；关闭页面后不保留。</li>
             <li>没有日期或链接的样本标为“用户提供，来源未独立核验”。评论里的链接不会被打开。</li>
-            <li>模型服务商自身的数据保留规则需要以其公开政策为准。</li>
           </ul>
           <p className="small" style={{ marginTop: 10 }}>
             当前状态：
@@ -222,7 +252,7 @@ export function ImportForm({ catalog, initialName }: { catalog: CatalogItem[]; i
                 ? aiStatus.fixture
                   ? "本地测试夹具（不是真实模型）"
                   : "模型分析可用"
-                : "未配置模型服务，只做清洗与去重，维度分析不会进行"}
+                : "AI 维度分析暂未启用（静态版本），只做本地清洗与去重"}
           </p>
         </div>
       </aside>

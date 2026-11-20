@@ -69,3 +69,8 @@ export async function POST(req: Request) {
   const result = await analyzeImport(rows, phone, inCatalog, dataset.phones, { ip: clientIp(req.headers) });
   return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
 }
+
+/** 跨域预检（CORS 头由 next.config.ts 按 CORS_ALLOW_ORIGIN 统一添加） */
+export function OPTIONS() {
+  return new Response(null, { status: 204 });
+}

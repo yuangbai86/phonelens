@@ -21,3 +21,8 @@ export async function POST(req: Request) {
   if ("error" in c) return NextResponse.json(c, { status: 404 });
   return NextResponse.json(c);
 }
+
+/** 跨域预检（CORS 头由 next.config.ts 按 CORS_ALLOW_ORIGIN 统一添加） */
+export function OPTIONS() {
+  return new Response(null, { status: 204 });
+}

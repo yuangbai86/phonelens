@@ -123,31 +123,23 @@ docs/               数据缺口、评估模板、试用模板、运行记录模
 - `prefers-reduced-motion: reduce` 下取消位移、缩放和骨架闪动，状态即时变化。
 - 状态不只靠颜色：情绪用 ＋ － ± ○ 符号，缺失值显示文字“尚未核验 / 暂无价格”。
 
-## 部署到 Vercel（基础演示版）
+## 部署
 
-不需要任何环境变量：`AI_ENABLED` 默认关闭，网站以基础模式和演示数据运行，不产生付费调用。
+### GitHub Pages（当前正式地址：https://yuangbai86.github.io/phonelens/）
 
-**方式一：在 Vercel 网页导入（不需要把任何密钥交给别人）**
+静态版本，所有基础功能在浏览器中完成：机型选择、需求与预算、规则推荐、关键差异、完整参数、口碑统计、证据抽屉、评论导入的解析与清洗（不上传）。AI 解释与 AI 维度分析需要后端，静态版本显示“暂未启用”。
 
-1. 登录 <https://vercel.com>，选择 Add New → Project → Import Git Repository，授权 GitHub 并选择本仓库。
-2. Framework Preset 选 Next.js；Root Directory 保持仓库根目录（若仍在旧仓库的 `phonelens/` 子目录，则设为 `phonelens`）。构建命令 `npm run build`，安装命令 `npm ci`，不添加环境变量。
-3. 点 Deploy。完成后打开分配的 `*.vercel.app` 地址，按下方“部署后检查”走一遍。
+- 推送到 `main` 后，`.github/workflows/pages.yml` 自动完成检查、静态构建（`PHONELENS_TARGET=static`，子路径 `/phonelens`）并发布。
+- 本地预览同样的产物：`npm run build:pages`，产物在 `out/`，需挂在 `/phonelens/` 路径下访问。
+- 仓库设置 → Pages → Build and deployment 的 Source 应为 “GitHub Actions”。
 
-**方式二：命令行**
+### 以后连接独立后端（可选）
 
-```bash
-npx vercel@latest login
-npx vercel@latest --prod
-```
+同一套代码的默认构建（`npm run build`）包含 `/api/*` 服务端接口（文件名为 `route.server.ts`，静态构建会自动排除）。把它单独部署到支持 Node 的平台后：
 
-**部署后检查**
-
-- `/`、示例对比、`/compare?...` 直接刷新、证据抽屉、`/import`、`/data` 都能打开。
-- `/api/status` 应返回 `{"ai":false,"reason":"disabled",...}`。
-- `POST /api/compare` 返回比较结果；`POST /api/recommend` 返回 `mode: "baseline"`。
-- 手机与电脑各看一遍首页和结果页。
-
-**以后公开启用模型解释**：同时配置 `AI_ENABLED=true`、`AI_API_KEY`、`AI_MODEL`、`UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`、`AI_DAILY_QUOTA`；缺少共享存储时服务端拒绝付费调用。可在 Vercel 防火墙为 `/api/recommend` 与 `/api/import` 加一层限流规则作为补充，额度与价格以上线时官方文档为准。
+1. 在后端配置模型与配额相关的服务端环境变量（见 `.env.example`），并设置 `CORS_ALLOW_ORIGIN=https://yuangbai86.github.io`。
+2. 在 GitHub 仓库 Settings → Secrets and variables → Actions → Variables 新建 `PHONELENS_API_BASE`，值为后端地址（只是公开地址，不是密钥）。
+3. 重新运行 Pages 工作流。前端会改为调用该后端；模型密钥始终只在后端。
 
 ## 已验证与未验证
 

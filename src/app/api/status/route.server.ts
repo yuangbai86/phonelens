@@ -9,3 +9,8 @@ export async function GET() {
   const reason = aiUnavailableReason(c);
   return NextResponse.json({ ai: reason === null, reason, fixture: c.provider === "fixture" && reason === null });
 }
+
+/** 跨域预检（CORS 头由 next.config.ts 按 CORS_ALLOW_ORIGIN 统一添加） */
+export function OPTIONS() {
+  return new Response(null, { status: 204 });
+}

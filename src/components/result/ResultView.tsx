@@ -5,7 +5,10 @@ import type { Comparison } from "@/lib/recommend/compare";
 import type { ExplainResponse } from "@/lib/recommend/service";
 import type { Preference, SampleWindow } from "@/lib/types";
 import { PREFERENCE_LABEL } from "@/lib/labels";
-import { toSearch } from "@/lib/query";
+import { CompareInputSchema, needsOf, toSearch } from "@/lib/query";
+import { dataset } from "@/lib/data";
+import { buildComparison } from "@/lib/recommend/compare";
+import { apiUrl, withBase } from "@/lib/runtime";
 import { buildBrief, shortName } from "@/lib/recommend/brief";
 import { EvidenceButton, EvidenceProvider } from "../EvidenceDrawer";
 import { DeviceArt } from "../DeviceArt";
@@ -95,7 +98,7 @@ export function ResultView({ initial, aiInitial, sourceNames }: Props) {
     if (!aiInitial.available || c.needs.prefs.length === 0) return;
     const ctrl = new AbortController();
     setAi({ state: "loading" });
-    fetch("/api/recommend", { method: "POST", headers: { "Content-Type": "application/json" }, body: key, signal: ctrl.signal })
+    fetch(apiUrl("/api/recommend"), { method: "POST", headers: { "Content-Type": "application/json" }, body: key, signal: ctrl.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status));
         return (await r.json()) as ExplainResponse;
@@ -107,17 +110,19 @@ export function ResultView({ initial, aiInitial, sourceNames }: Props) {
     return () => ctrl.abort();
   }, [key, aiInitial.available, retry, c.needs.prefs.length]);
 
+  // 修改需求或样本范围：在浏览器中重新计算（与服务端使用同一套规则与数据）
   const refetch = useCallback(
     async (next: typeof input, kind: "prefs" | "window") => {
       setUpdating(kind);
       setUpdateFailed(false);
       try {
-        const r = await fetch("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
-        if (!r.ok) throw new Error(String(r.status));
-        const data = (await r.json()) as Comparison;
-        if (!data || !("recommendation" in data)) throw new Error("bad");
+        await new Promise((r) => setTimeout(r, 120)); // 让“正在更新”状态可见，避免界面闪跳
+        const parsed = CompareInputSchema.safeParse(next);
+        if (!parsed.success) throw new Error("bad input");
+        const data = buildComparison(dataset, next.a, next.b, needsOf(parsed.data), next.window);
+        if ("error" in data) throw new Error(data.error);
         setC(data);
-        history.replaceState(null, "", `/compare?${toSearch(next)}`);
+        history.replaceState(null, "", withBase(`/compare/?${toSearch(next)}`));
         if (kind === "prefs") {
           saveForm({ a: next.a, b: next.b, budget: next.budget ? String(next.budget) : "", prefs: next.prefs });
           toast("已按新的需求更新");
@@ -345,7 +350,7 @@ export function ResultView({ initial, aiInitial, sourceNames }: Props) {
                       ? "结论按固定规则得出；个性化解释正在生成，通过引用校验后显示在这里。"
                       : ai.state === "fallback"
                         ? `结论按固定规则得出。${ai.message}`
-                        : "结论根据已记录的参数和样本统计按固定规则得出，没有使用模型。"}{" "}
+                        : ai.reason ?? "结论根据已记录的参数和样本统计按固定规则得出，没有使用模型。"}{" "}
                   {ai.state === "fallback" && ai.retryable && (
                     <button type="button" className="link-btn" onClick={() => setRetry((x) => x + 1)}>
                       重试

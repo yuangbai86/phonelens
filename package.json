@@ -14,7 +14,8 @@
     "export-prompts": "tsx scripts/export-prompts.ts",
     "build-fixtures": "tsx scripts/build-fixtures.ts",
     "eval-labels": "tsx scripts/eval-labels.ts",
-    "check": "npm run typecheck && npm run test && npm run validate-data && npm run build"
+    "check": "npm run typecheck && npm run test && npm run validate-data && npm run build",
+    "build:pages": "PHONELENS_TARGET=static NEXT_PUBLIC_BASE_PATH=/phonelens next build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.6.0",

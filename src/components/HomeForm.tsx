@@ -181,7 +181,7 @@ export function HomeForm({ catalog }: { catalog: CatalogItem[] }) {
       return requestAnimationFrame(() => budgetRef.current?.focus());
     }
     setBusy(true);
-    router.push(`/compare?${toSearch({ a: s.a!, b: s.b!, budget: s.budget ? Number(s.budget) : null, prefs: s.prefs, device: null, eco: [] })}`);
+    router.push(`/compare/?${toSearch({ a: s.a!, b: s.b!, budget: s.budget ? Number(s.budget) : null, prefs: s.prefs, device: null, eco: [] })}`);
   };
 
   return (
@@ -250,7 +250,7 @@ export function HomeForm({ catalog }: { catalog: CatalogItem[] }) {
             </span>
           </span>
         </button>
-        <Link className="link-btn" href={`/compare?${toSearch(EXAMPLE)}`}>
+        <Link className="link-btn" href={`/compare/?${toSearch(EXAMPLE)}`}>
           看一个示例 ›
         </Link>
       </div>
