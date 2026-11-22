@@ -67,71 +67,29 @@ interface ReviewSignal {
 }
 
 /**
- * 口碑信号的保守规则：
- * - 只在两组样本可比（来源相同、数量足够、时间范围大体重叠、系统版本覆盖接近）时使用；
- * - 对“正面占比”“负面占比”分别做双比例 z 检验，|z| ≥ 1.96 才视为差异明显，且两个方向不得互相矛盾；
- * - 即使差异明显，口碑信号也只算“较弱”，不能单独让推荐变成“更值得考虑”。
- * 这是对已收录样本的描述，不是对总体体验的估计。
+ * 口碑信号：只做定性描述，不做显著性检验，也不据此判定哪款体验更好。
+ * 评论来自小规模、来源各异的用户反馈，条数差异不能说明产品优劣；
+ * 这里只把已分析样本中的正面、负面、褒贬混合条数如实写出，方向一律为“未判定”。
  */
-export const MIN_MENTIONS = 3;
-export const Z_THRESHOLD = 1.96;
-
-export function twoPropZ(x1: number, n1: number, x2: number, n2: number): number {
-  if (n1 === 0 || n2 === 0) return 0;
-  const p = (x1 + x2) / (n1 + n2);
-  const se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
-  if (se === 0) return 0;
-  return (x1 / n1 - x2 / n2) / se;
-}
-
 export function reviewSignal(input: EngineInput, dim: Dimension): ReviewSignal {
-  const { stats, comparability, names } = input;
+  const { stats } = input;
   const ev = [statId(stats.a.phone_id, dim, stats.a.window), statId(stats.b.phone_id, dim, stats.b.window)];
   const label = DIMENSION_LABEL[dim];
-  if (!input.hasReviews.a || !input.hasReviews.b) {
-    return {
-      side: "unknown",
-      strength: null,
-      claim: { text: `至少一款没有可用的评论样本，暂不依据${label}口碑判断。`, evidence: ev.filter((_, i) => input.hasReviews[i === 0 ? "a" : "b"]) },
-    };
+  const has = { a: input.hasReviews.a, b: input.hasReviews.b };
+  if (!has.a && !has.b) {
+    return { side: "unknown", strength: null, claim: { text: `两款都还没有已分析的评论，暂不涉及${label}口碑。`, evidence: [] } };
   }
-  const A = stats.a.dims[dim];
-  const B = stats.b.dims[dim];
   const desc = (s: Side) => {
+    if (!has[s]) return `${tag(s)} 暂无已分析评论`;
     const d = stats[s].dims[dim];
-    return `${tag(s)} 有 ${d.pos} 条正面、${d.neg} 条负面、${d.mixed} 条褒贬混合（已分析 ${stats[s].n} 条）`;
+    return `${tag(s)} 已分析 ${stats[s].n} 条中提到${label} ${d.mentions} 条（正面 ${d.pos}、负面 ${d.neg}、褒贬混合 ${d.mixed}）`;
   };
-  const base = `已收录样本中提到${label}的评论：${desc("a")}；${desc("b")}。`;
-  if (!comparability.comparable) {
-    return {
-      side: "unknown",
-      strength: null,
-      claim: { text: `${base}两款评论样本口径不同（${comparability.reasons[0]}），不据此比较优劣。`, evidence: ev },
-    };
-  }
-  if (A.mentions < MIN_MENTIONS || B.mentions < MIN_MENTIONS) {
-    return { side: "unknown", strength: null, claim: { text: `${base}至少一款提及少于 ${MIN_MENTIONS} 条，不足以判断。`, evidence: ev } };
-  }
-  const na = stats.a.n;
-  const nb = stats.b.n;
-  const zPos = twoPropZ(A.pos, na, B.pos, nb); // > 0：A 正面占比更高
-  const zNeg = twoPropZ(A.neg, na, B.neg, nb); // > 0：A 负面占比更高
-  const favorA = zPos >= Z_THRESHOLD || zNeg <= -Z_THRESHOLD;
-  const favorB = zPos <= -Z_THRESHOLD || zNeg >= Z_THRESHOLD;
-  if (favorA === favorB) {
-    return {
-      side: "even",
-      strength: null,
-      claim: { text: `${base}按当前样本量，两款的正负面占比差异不明显，不据此区分优劣。`, evidence: ev },
-    };
-  }
-  const winner: Side = favorA ? "a" : "b";
   return {
-    side: winner,
-    strength: "weak",
+    side: "unknown",
+    strength: null,
     claim: {
-      text: `${base}${tag(winner)}（${names[winner]}）的正面反馈占比相对较高，差异超出样本波动范围；但这只描述已收录样本，不能单独证明实际体验更好。`,
-      evidence: ev,
+      text: `${desc("a")}；${desc("b")}。样本量小、来源不同，只作定性参考，不据此判断哪款体验更好。`,
+      evidence: ev.filter((_, i) => has[i === 0 ? "a" : "b"]),
     },
   };
 }

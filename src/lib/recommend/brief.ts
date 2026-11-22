@@ -167,7 +167,7 @@ export function shortReason(c: Comparison, v: Verdict): Claim {
     if (v.pref === "gaming") return { text: "游戏：只有芯片名称，无法判断实际表现", evidence: ev(v) };
     if (v.pref === "handling") return { text: "轻便：重量尚未核验，无法比较", evidence: ev(v) };
     if (c.stats.a.n_total === 0 && c.stats.b.n_total === 0) return { text: `${label}：还没有收录真实评论，暂无法判断`, evidence: ev(v) };
-    return { text: `${label}：缺少可比的样本反馈`, evidence: ev(v) };
+    return { text: `${label}：只有少量样本反馈，仅作定性参考`, evidence: ev(v) };
   }
   if (v.side === "even") return { text: `${label}：样本反馈差异不明显`, evidence: ev(v) };
   return { text: `${label}：${n[v.side]} 的样本反馈更正面`, evidence: ev(v) };

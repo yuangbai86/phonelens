@@ -3,7 +3,8 @@
  * 维度分析需要模型，静态版本不进行，界面会说明“暂未启用”。
  */
 import { computeStats } from "../stats";
-import type { PhoneRecord, ReviewRecord } from "../types";
+import type { AnalysisRecord, PhoneRecord, ReviewRecord } from "../types";
+import { qualitativeSummary } from "../stats/qualitative";
 import type { ImportRow } from "../csv";
 import { DIMENSION_LABEL, SENTIMENT_LABEL } from "../labels";
 import type { ImportResult } from "./service";
@@ -32,7 +33,14 @@ export function customPhone(name: string): PhoneRecord {
   };
 }
 
-export function cleanImportLocally(rows: ImportRow[], phone: PhoneRecord, inCatalog: boolean, catalog: PhoneRecord[], message: string): ImportResult {
+export function cleanImportLocally(
+  rows: ImportRow[],
+  phone: PhoneRecord,
+  inCatalog: boolean,
+  catalog: PhoneRecord[],
+  message: string | null,
+  analysis: AnalysisRecord[] = [],
+): ImportResult {
   const today = new Date().toISOString().slice(0, 10);
   const reviews: ReviewRecord[] = rows.map((r) => ({
     id: r.review_id,
@@ -45,11 +53,12 @@ export function cleanImportLocally(rows: ImportRow[], phone: PhoneRecord, inCata
     usage_scope: "用户提交，仅在本机浏览器处理",
     data_kind: "user",
   }));
-  const stats = computeStats({ phone, catalog, reviews, analysis: [], audit: [], asOf: today, window: "all" });
+  const stats = computeStats({ phone, catalog, reviews, analysis, audit: [], asOf: today, window: "all" });
   const { views, ...summary } = stats;
+  const labelled = analysis.some((a) => a.status !== "pending");
   const rowById = new Map(rows.map((r) => [r.review_id, r]));
   return {
-    mode: "baseline",
+    mode: labelled ? "claude_import" : "baseline",
     fixture: false,
     message,
     phone: { id: phone.id, name: `${phone.brand} ${phone.model}`.trim(), in_catalog: inCatalog },
@@ -66,10 +75,12 @@ export function cleanImportLocally(rows: ImportRow[], phone: PhoneRecord, inCata
         source_url: row.source_url,
         status:
           v.status.kind === "excluded" || v.status.kind === "flagged" ? `${STATUS_TEXT[v.status.kind]}：${v.status.note}` : STATUS_TEXT[v.status.kind] ?? v.status.kind,
-        labels: v.labels.map((l) => ({ dimension: DIMENSION_LABEL[l.dimension], sentiment: SENTIMENT_LABEL[l.sentiment], excerpt: l.excerpt })),
+        labels: v.labels.map((l) => ({ dimension: DIMENSION_LABEL[l.dimension], sentiment: SENTIMENT_LABEL[l.sentiment], excerpt: l.excerpt, issue: l.issue ?? "" })),
       };
     }),
     removed_labels: 0,
-    prompt_version: null,
+    prompt_version: labelled ? analysis.find((a) => a.prompt_version)?.prompt_version ?? null : null,
+    sendable: views.filter((v) => v.status.kind === "pending" || (labelled && v.status.kind !== "excluded" && v.status.kind !== "flagged")).map((v) => ({ id: v.review.id, text: v.review.text })),
+    qualitative: labelled ? qualitativeSummary(stats, views) : undefined,
   };
 }

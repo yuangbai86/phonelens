@@ -9,6 +9,10 @@ import pricesJson from "../../../data/v1/prices.json";
 import reviewsJson from "../../../data/v1/reviews.json";
 import analysisJson from "../../../data/v1/analysis.json";
 import auditJson from "../../../data/v1/audit.json";
+// 真实评论与其标注（经 scripts/import-reviewed.ts 校验、人工审核后写入；演示数据生成脚本不会覆盖）
+import realReviewsJson from "../../../data/v1/reviews.real.json";
+import realAnalysisJson from "../../../data/v1/analysis.real.json";
+import reviewSourcesJson from "../../../data/v1/review-sources.json";
 import type {
   AnalysisRecord,
   AuditRecord,
@@ -31,14 +35,23 @@ export interface Dataset {
   audit: AuditRecord[];
 }
 
+const realReviews = realReviewsJson as ReviewRecord[];
+const realAnalysis = realAnalysisJson as AnalysisRecord[];
+const baseMeta = metaJson as DataMeta;
+
 export const dataset: Dataset = {
-  meta: metaJson as DataMeta,
-  sources: sourcesJson as SourceRecord[],
+  meta: {
+    ...baseMeta,
+    // 真实评论数量计入版本号，更新评论后缓存不会串用
+    data_version: realReviews.length ? `${baseMeta.data_version}+reviews-${realReviews.length}` : baseMeta.data_version,
+    label_version: realAnalysis.length ? `${baseMeta.label_version}+real-${realAnalysis.length}` : baseMeta.label_version,
+  },
+  sources: [...(sourcesJson as SourceRecord[]), ...(reviewSourcesJson as SourceRecord[])],
   phones: phonesJson as PhoneRecord[],
   specs: specsJson as SpecRecord[],
   prices: pricesJson as PriceRecord[],
-  reviews: reviewsJson as ReviewRecord[],
-  analysis: analysisJson as AnalysisRecord[],
+  reviews: [...(reviewsJson as ReviewRecord[]), ...realReviews],
+  analysis: [...(analysisJson as AnalysisRecord[]), ...realAnalysis],
   audit: auditJson as AuditRecord[],
 };
 

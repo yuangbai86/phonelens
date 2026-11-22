@@ -2,7 +2,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { EXTRACT_PROMPT_VERSION, EXTRACT_SYSTEM, RECOMMEND_PROMPT_VERSION, RECOMMEND_SYSTEM } from "../src/lib/ai/prompts";
+import { EXTRACT_OUTPUT_FORMAT, EXTRACT_PROMPT_VERSION, EXTRACT_SYSTEM, RECOMMEND_PROMPT_VERSION, RECOMMEND_SYSTEM } from "../src/lib/ai/prompts";
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../prompts");
 mkdirSync(dir, { recursive: true });
@@ -10,7 +10,7 @@ export const render = (title: string, version: string, body: string, note: strin
   `# ${title}\n\n版本：\`${version}\`（唯一来源：\`src/lib/ai/prompts.ts\`，本文件由 \`npm run export-prompts\` 生成）\n\n${note}\n\n## 系统提示词\n\n\`\`\`text\n${body}\n\`\`\`\n`;
 writeFileSync(
   path.join(dir, "extract.md"),
-  render("评论维度提取提示词", EXTRACT_PROMPT_VERSION, EXTRACT_SYSTEM, "用户消息为 JSON 数组 `[{id, text}]`；输出结构见 `src/lib/import/service.ts` 中的 `ExtractSchema`。程序随后校验编号、维度、情绪和摘录是否逐字出现在原文中。"),
+  render("评论维度提取提示词", EXTRACT_PROMPT_VERSION, `${EXTRACT_SYSTEM}\n\n${EXTRACT_OUTPUT_FORMAT}`, "用户消息为 JSON 数组 `[{id, text}]`；输出结构见 `src/lib/import/schema.ts` 中的 `ExtractSchema`。程序随后校验编号、维度、情绪、摘录是否逐字出现在原文中，以及“具体问题”的长度与数字。导入页的“复制给 Claude”按钮会把本提示词、输出格式和评论一起复制。"),
 );
 writeFileSync(
   path.join(dir, "recommend.md"),

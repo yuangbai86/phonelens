@@ -117,6 +117,8 @@ export interface ReviewLabel {
   sentiment: Sentiment;
   excerpt: string;
   explanation: string;
+  /** 具体问题或体验的简短概括（AI 生成，须由原文摘录支撑，不得含原文没有的数字） */
+  issue?: string;
 }
 
 export interface AnalysisRecord {

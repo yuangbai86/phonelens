@@ -3,7 +3,7 @@
  * `npm run export-prompts` 会同步生成 prompts/*.md 供审阅。
  */
 
-export const EXTRACT_PROMPT_VERSION = "extract-v1.0";
+export const EXTRACT_PROMPT_VERSION = "extract-v1.1";
 export const RECOMMEND_PROMPT_VERSION = "recommend-v1.1";
 
 export const EXTRACT_SYSTEM = `你是手机评论的维度标注员。你只做信息抽取，不做推荐。
@@ -29,8 +29,20 @@ export const EXTRACT_SYSTEM = `你是手机评论的维度标注员。你只做�
 3. 不做推断：例如“拍照很好，但玩游戏容易热”只能得到 camera/pos 与 heat/neg，不能额外推出 smoothness。
    电池容量、像素、RAM 等规格数字本身不代表体验好坏。
 4. 语义模糊、无法确定维度或情绪的评论，把 id 放入 unclear，不要硬标。
-5. explanation 用一句不超过 30 字的中文说明判断依据。
-6. 只输出符合给定 JSON 结构的结果。`;
+5. issue 用不超过 20 字概括这条评论在该维度上的具体问题或体验（如“打游戏半小时机身发烫”），只能概括摘录里说到的内容，不得加入摘录里没有的数字、场景或原因。
+6. explanation 用一句不超过 30 字的中文说明判断依据。
+7. 只输出符合给定 JSON 结构的结果。`;
+
+/** 在 Claude 对话中手动标注时使用的输出格式说明（对话没有强制的结构约束，所以写明格式） */
+export const EXTRACT_OUTPUT_FORMAT = `只输出一个 JSON 对象，不要输出其他文字或代码块标记，格式如下：
+{
+  "labels": [
+    { "review_id": "评论编号", "dimension": "battery|heat|camera|smoothness|stability|handling|shopping", "sentiment": "pos|neg|neu|mixed", "excerpt": "逐字复制的原文片段", "issue": "具体问题概括", "explanation": "判断依据" }
+  ],
+  "unclear": ["语义模糊、无法确定的评论编号"],
+  "no_dimension": ["没有涉及任何维度的评论编号"]
+}
+每条输入评论的编号都必须出现在 labels、unclear 或 no_dimension 中的至少一处。`;
 
 export const RECOMMEND_SYSTEM = `你是手机选购说明的撰写者。你的任务是把程序已经整理好的比较材料，改写成清楚、克制的中文解释。
 

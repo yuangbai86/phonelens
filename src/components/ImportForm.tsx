@@ -9,9 +9,14 @@ import { DIMENSION_LABEL, SENTIMENT_LABEL, SENTIMENT_SYMBOL } from "@/lib/labels
 import { IconAlert, IconCheck, IconFlask, IconInfo } from "./Icons";
 import { dataset } from "@/lib/data";
 import { cleanImportLocally, customPhone } from "@/lib/import/local";
+import { CLAUDE_LABELER, parseClaudeResponse, type ClaudeImportResult } from "@/lib/import/claude";
+import type { ImportRow } from "@/lib/csv";
+import type { AnalysisRecord, PhoneRecord } from "@/lib/types";
+import { ImportResultPanel } from "./ImportResultPanel";
 import { BACKEND_ENABLED, apiUrl, withBase } from "@/lib/runtime";
 
 const CUSTOM = "__custom__";
+const LOCAL_MESSAGE = null;
 
 export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
   const initialName = (useSearchParams().get("name") ?? "").replace(/[\u0000-\u001f<>]/g, "").slice(0, 40);
@@ -26,6 +31,20 @@ export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
   const [consentErr, setConsentErr] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [lastInput, setLastInput] = useState<{ rows: ImportRow[]; rec: PhoneRecord; inCatalog: boolean } | null>(null);
+  const [report, setReport] = useState<ClaudeImportResult | null>(null);
+  const [lastAnalysis, setLastAnalysis] = useState<AnalysisRecord[]>([]);
+
+  // 粘贴 Claude 的回复：校验后在本机重新计算统计；任何不合格的标签都不计入
+  const applyClaude = (text: string): string | null => {
+    if (!lastInput || !result?.sendable?.length) return "请先完成导入与清洗。";
+    const r = parseClaudeResponse(text, result.sendable);
+    if (!r.ok) return r.error;
+    setReport(r.result);
+    setLastAnalysis(r.result.analysis);
+    setResult(cleanImportLocally(lastInput.rows, lastInput.rec, lastInput.inCatalog, dataset.phones, null, r.result.analysis));
+    return null;
+  };
   const [aiStatus, setAiStatus] = useState<{ ai: boolean; fixture: boolean } | null>(null);
   const ids = { phone: useId(), outside: useId(), text: useId(), file: useId(), source: useId(), consent: useId(), err: useId() };
 
@@ -67,9 +86,10 @@ export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
       await new Promise((r) => setTimeout(r, 120));
       const parsed = format === "csv" ? parseImportCsv(content, new Set([phoneId])) : parsePasted(content, phoneId, source);
       const rec = phone === CUSTOM ? customPhone(outside) : dataset.phones.find((p) => p.id === phone)!;
-      setResult(
-        cleanImportLocally(parsed.rows, rec, phone !== CUSTOM, dataset.phones, "已在你的浏览器中完成清洗与去重。维度分析需要 AI 后端，当前暂未启用。"),
-      );
+      setLastInput({ rows: parsed.rows, rec, inCatalog: phone !== CUSTOM });
+      setReport(null);
+      setLastAnalysis([]);
+      setResult(cleanImportLocally(parsed.rows, rec, phone !== CUSTOM, dataset.phones, LOCAL_MESSAGE));
       setBusy(false);
       return;
     }
@@ -200,7 +220,7 @@ export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
             <span className="box" aria-hidden="true" style={{ marginTop: 4 }}>
               <IconCheck size={11} />
             </span>
-            <span>{remote ? "我确认有权提交这些文本，并知道它们会发送给已配置的模型服务做维度分析。" : "我确认有权使用这些文本（静态版本只在本机浏览器处理，不会上传）。"}</span>
+            <span>{remote ? "我确认有权提交这些文本，并知道它们会发送给已配置的模型服务做维度分析。" : "我确认有权使用这些文本，并清楚来源与使用范围（网站只在本机浏览器处理，不会上传）。"}</span>
           </label>
           <div id={`${ids.consent}-msg`}>
             {consentErr && (
@@ -237,8 +257,9 @@ export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
               </>
             ) : (
               <>
-                <li>解析、去重、广告与机型混入识别都在你的浏览器中完成，文本不会上传到任何服务器。</li>
-                <li>按续航、发热等维度提取标签需要 AI 后端，当前暂未启用，所以结果里的维度统计为空。</li>
+                <li>解析、去重、广告与机型混入识别都在你的浏览器中完成，网站不会上传文本。</li>
+                <li>维度标注可以在你自己的 Claude 对话中完成：复制标注请求，把 Claude 回复的 JSON 粘贴回来，程序逐条核对编号、原文摘录和具体问题后再计数。是否把文本发给 Claude 由你决定。</li>
+                <li>样本量小时只给定性总结，不做显著性检验，也不据此判断哪款体验更好。</li>
               </>
             )}
             <li>导入样本与内置样本分开统计，不混在一起计算比例；关闭页面后不保留。</li>
@@ -252,117 +273,34 @@ export function ImportForm({ catalog }: { catalog: CatalogItem[] }) {
                 ? aiStatus.fixture
                   ? "本地测试夹具（不是真实模型）"
                   : "模型分析可用"
-                : "AI 维度分析暂未启用（静态版本），只做本地清洗与去重"}
+                : "可用 Claude 对话完成标注（无需 API），程序在本机校验"}
           </p>
         </div>
       </aside>
 
       {result && (
-        <section className="card enter" style={{ gridColumn: "1 / -1", padding: 20 }} aria-labelledby="import-result-h">
-          <div className="section-title" style={{ marginBottom: 10 }}>
-            <h2 id="import-result-h" style={{ fontSize: 18 }}>
-              {result.phone.name} · 导入样本摘要
-            </h2>
-            <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <span className="badge badge-outline">用户提供，来源未独立核验</span>
-              {result.mode === "ai" ? (
-                result.fixture ? (
-                  <span className="badge badge-demo">
-                    <IconFlask /> 测试夹具标注（非模型）
-                  </span>
-                ) : (
-                  <span className="badge badge-blue">本次 AI 分析 · 摘录已校验</span>
-                )
-              ) : (
-                <span className="badge">仅清洗，未做维度分析</span>
-              )}
-            </span>
-          </div>
-          {result.message && (
-            <p className="notice notice-info" style={{ marginBottom: 12 }}>
-              <IconInfo className="icon" /> {result.message}
-            </p>
-          )}
-          {!result.phone.in_catalog && (
-            <p className="notice notice-warn" style={{ marginBottom: 12 }}>
-              <IconAlert className="icon" /> 目录外机型：没有已核验参数，这里只汇总你提供的评论，不生成完整选购建议。
-            </p>
-          )}
-          <dl className="kv" style={{ marginBottom: 14 }}>
-            <dt>提交</dt>
-            <dd>{result.stats.n_total} 条</dd>
-            <dt>清洗排除</dt>
-            <dd>{result.stats.n_excluded} 条</dd>
-            <dt>待复核 / 未分析</dt>
-            <dd>
-              {result.stats.n_flagged + result.stats.n_needs_review} / {result.stats.n_pending} 条
-            </dd>
-            <dt>已分析有效（N）</dt>
-            <dd>
-              <strong>{result.stats.n} 条</strong>
-            </dd>
-          </dl>
-          {result.stats.n > 0 && (
-            <div className="table-scroll">
-              <table className="data-table">
-                <caption className="sr-only">各维度提及数量（分母为已分析有效评论）</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">维度</th>
-                    <th scope="col">提及 / N</th>
-                    <th scope="col">{SENTIMENT_SYMBOL.pos} 正面</th>
-                    <th scope="col">{SENTIMENT_SYMBOL.neg} 负面</th>
-                    <th scope="col">{SENTIMENT_SYMBOL.mixed} 褒贬混合</th>
-                    <th scope="col">{SENTIMENT_SYMBOL.neu} 中性</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {DIMENSIONS.map((d) => {
-                    const x = result.stats.dims[d];
-                    return (
-                      <tr key={d}>
-                        <th scope="row">{DIMENSION_LABEL[d]}</th>
-                        <td>
-                          {x.mentions} / {result.stats.n}
-                        </td>
-                        <td>{x.pos}</td>
-                        <td>{x.neg}</td>
-                        <td>{x.mixed}</td>
-                        <td>{x.neu}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <h3 style={{ fontSize: 15, margin: "18px 0 8px" }}>逐条结果</h3>
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">行</th>
-                  <th scope="col">评论</th>
-                  <th scope="col">状态</th>
-                  <th scope="col">标签</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.reviews.map((r) => (
-                  <tr key={r.id}>
-                    <td className="mono">{r.line}</td>
-                    <td style={{ minWidth: 220 }}>{r.text}</td>
-                    <td style={{ minWidth: 120 }}>{r.status}</td>
-                    <td>{r.labels.length ? r.labels.map((l) => `${l.dimension}·${l.sentiment}`).join("、") : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="small muted" style={{ marginTop: 10 }}>
-            页面关闭后这些结果不会保留。{SENTIMENT_LABEL.mixed}与明确负面分开统计。
-          </p>
-        </section>
+        <ImportResultPanel
+          result={result}
+          report={report}
+          onClaude={applyClaude}
+          onReset={() => {
+            if (!lastInput) return;
+            setReport(null);
+            setResult(cleanImportLocally(lastInput.rows, lastInput.rec, lastInput.inCatalog, dataset.phones, LOCAL_MESSAGE));
+          }}
+          downloadPayload={() => ({
+            format: "phonelens-review-import/v1",
+            created_at: new Date().toISOString(),
+            phone_id: lastInput?.rec.id ?? null,
+            phone_name: result.phone.name,
+            prompt_version: result.prompt_version,
+            labeler: CLAUDE_LABELER,
+            note: "用户提供的反馈与 Claude 辅助标注，经 PhoneLens 程序校验；发布前需人工审核来源授权与标注。",
+            reviews: lastInput?.rows ?? [],
+            analysis: lastAnalysis,
+            validation: report,
+          })}
+        />
       )}
     </div>
   );

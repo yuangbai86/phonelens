@@ -66,12 +66,13 @@ describe("结果摘要", () => {
     expect(none.tradeoff).toBeNull();
   });
 
-  it("只有评论倾向时，结论写成“略偏向”，取舍对应其他方面", () => {
+  it("只有评论时不判定胜负：结论为证据不足，并说明评论只作定性参考", () => {
     const br = buildBrief(cmp("demo-alpha", "demo-beta", ["battery"]));
-    expect(br.eyebrow).toBe("各有取舍");
-    expect(br.headline.text).toContain("略偏向 Beta");
-    expect(br.tradeoff?.text).toContain("Alpha 更轻");
+    expect(br.eyebrow).toBe("证据不足");
+    expect(br.missing).toContain("仅作定性参考");
+    expect(br.tradeoff).toBeNull();
   });
+
 });
 
 describe("关键差异", () => {

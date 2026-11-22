@@ -67,7 +67,7 @@ export type EvidenceItem =
       review_date: string | null;
       system_version: string | null;
       source: EvidenceSource | null;
-      labels: { dimension: string; sentiment: string; excerpt: string }[];
+      labels: { dimension: string; sentiment: string; excerpt: string; issue?: string }[];
       data_kind: DataKind;
       display: "full_text" | "excerpt" | "summary_only" | "none";
     };
@@ -162,7 +162,7 @@ export function reviewEvidence(ds: Dataset, stats: SampleStats, phoneName: strin
       review_date: v.review.review_date,
       system_version: v.review.system_version,
       source: src(ds, v.review.source_id),
-      labels: v.labels.map((l) => ({ dimension: DIMENSION_LABEL[l.dimension], sentiment: SENTIMENT_LABEL[l.sentiment], excerpt: l.excerpt })),
+      labels: v.labels.map((l) => ({ dimension: DIMENSION_LABEL[l.dimension], sentiment: SENTIMENT_LABEL[l.sentiment], excerpt: l.excerpt, ...(l.issue ? { issue: l.issue } : {}) })),
       data_kind: v.review.data_kind,
       display: s?.allowed_display ?? "none",
     };

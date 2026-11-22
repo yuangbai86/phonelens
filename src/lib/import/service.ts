@@ -1,5 +1,7 @@
 import "server-only";
 import { z } from "zod";
+import { ExtractSchema } from "./schema";
+import type { QualSummary } from "../stats/qualitative";
 import { aiUnavailableReason, readAiConfig, UNAVAILABLE_TEXT, type AiConfig } from "../ai/config";
 import { checkRate, consumeQuota, hashIp, storeFor, type CounterStore } from "../ai/guard";
 import { AiError, createAdapter, type AiAdapter } from "../ai/adapter";
@@ -10,23 +12,10 @@ import type { AnalysisRecord, PhoneRecord, ReviewRecord } from "../types";
 import type { ImportRow } from "../csv";
 import { DIMENSION_LABEL, SENTIMENT_LABEL } from "../labels";
 
-export const ExtractSchema = z.object({
-  labels: z
-    .array(
-      z.object({
-        review_id: z.string().max(60),
-        dimension: z.enum(["battery", "heat", "camera", "smoothness", "stability", "handling", "shopping"]),
-        sentiment: z.enum(["pos", "neg", "neu", "mixed"]),
-        excerpt: z.string().max(400),
-        explanation: z.string().max(120),
-      }),
-    )
-    .max(200),
-  unclear: z.array(z.string().max(60)).max(60),
-});
+export { ExtractSchema };
 
 export interface ImportResult {
-  mode: "ai" | "baseline";
+  mode: "ai" | "baseline" | "claude_import";
   fixture: boolean;
   message: string | null;
   phone: { id: string; name: string; in_catalog: boolean };
@@ -40,10 +29,14 @@ export interface ImportResult {
     system_version: string | null;
     source_url: string | null;
     status: string;
-    labels: { dimension: string; sentiment: string; excerpt: string }[];
+    labels: { dimension: string; sentiment: string; excerpt: string; issue: string }[];
   }[];
   removed_labels: number;
   prompt_version: string | null;
+  /** 通过清洗、可以交给模型标注的评论 */
+  sendable?: { id: string; text: string }[];
+  /** 定性总结（只有完成标注后才有） */
+  qualitative?: QualSummary;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -73,7 +66,7 @@ function fixtureLabels(reviews: ReviewRecord[]) {
       const m = re.exec(r.text);
       if (m) {
         any = true;
-        labels.push({ review_id: r.id, dimension: dim as never, sentiment: s as never, excerpt: m[0], explanation: "测试夹具关键词匹配" });
+        labels.push({ review_id: r.id, dimension: dim as never, sentiment: s as never, excerpt: m[0], issue: "", explanation: "测试夹具关键词匹配" });
       }
     }
     if (!any) unclear.push(r.id);
@@ -194,7 +187,7 @@ export async function analyzeImport(
           v.status.kind === "excluded" || v.status.kind === "flagged"
             ? `${STATUS_TEXT[v.status.kind]}：${v.status.note}`
             : STATUS_TEXT[v.status.kind] ?? v.status.kind,
-        labels: v.labels.map((l) => ({ dimension: DIMENSION_LABEL[l.dimension], sentiment: SENTIMENT_LABEL[l.sentiment], excerpt: l.excerpt })),
+        labels: v.labels.map((l) => ({ dimension: DIMENSION_LABEL[l.dimension], sentiment: SENTIMENT_LABEL[l.sentiment], excerpt: l.excerpt, issue: l.issue ?? "" })),
       };
     }),
     removed_labels: removed,

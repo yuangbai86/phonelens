@@ -4,7 +4,7 @@ import { buildComparison, type Comparison } from "@/lib/recommend/compare";
 import { decideStatus, type Verdict } from "@/lib/recommend/engine";
 import { budgetFit, fairnessWarnings, pickPrice } from "@/lib/rules";
 import { buildPack, cacheKey, statusAllowed, validateExplanation, checkNumbers } from "@/lib/recommend/ai-explain";
-import { twoPropZ, reviewSignal } from "@/lib/recommend/engine";
+import { reviewSignal } from "@/lib/recommend/engine";
 import { computeStats, compareSamples } from "@/lib/stats";
 import type { PhoneRecord, PriceRecord, UserNeeds } from "@/lib/types";
 
@@ -39,44 +39,38 @@ describe("推荐状态规则", () => {
   });
 });
 
-describe("口碑信号的保守规则", () => {
-  it("双比例检验：样本少时，条数差距不算明显", () => {
-    expect(Math.abs(twoPropZ(3, 20, 1, 20))).toBeLessThan(1.96);
-    expect(Math.abs(twoPropZ(14, 40, 2, 40))).toBeGreaterThan(1.96);
+describe("口碑只做定性描述，不判定胜负", () => {
+  it("不论条数差多少，评论都不给方向（不做显著性检验）", () => {
+    for (const p of ["battery", "camera", "gaming", "ecosystem"] as const) {
+      const c = cmp("demo-alpha", "demo-beta", { prefs: [p] });
+      expect(c.recommendation.verdicts[0].side, p).toBe("unknown");
+      expect(c.recommendation.status, p).toBe("insufficient");
+    }
   });
 
-  it("续航只靠评论时返回各有取舍，不判定 B 体验更好", () => {
+  it("口碑说明写出条数与分母，并声明只作定性参考", () => {
     const c = cmp("demo-alpha", "demo-beta", { prefs: ["battery"] });
-    expect(c.recommendation.status).toBe("tradeoff");
-    expect(c.recommendation.lean).toBe("b");
-    expect(c.recommendation.verdicts[0].strength).toBe("weak");
-    expect(c.recommendation.verdicts[0].claims[0].text).toContain("不能单独证明");
+    const t = c.recommendation.verdicts[0].claims[0].text;
+    expect(t).toContain("A 已分析 26 条中提到续航 6 条（正面 1、负面 2、褒贬混合 1）");
+    expect(t).toContain("只作定性参考");
+    expect(t).not.toMatch(/更正面|占优|反馈相对更多/);
+    expect(t).toContain("不据此判断哪款体验更好");
   });
 
-  it("影像正面条数 6 对 2，但样本量下差异不明显，判为差异不明显", () => {
-    const c = cmp("demo-alpha", "demo-beta", { prefs: ["camera"] });
-    expect(c.recommendation.verdicts[0].side).toBe("even");
-    expect(c.recommendation.status).toBe("tradeoff");
+  it("只有参数能给出方向：轻便看重量，续航评论不再构成反方向", () => {
+    const c = cmp("demo-alpha", "demo-beta", { prefs: ["handling", "battery"] });
+    expect(c.recommendation.verdicts[0].side).toBe("a");
+    expect(c.recommendation.verdicts[1].side).toBe("unknown");
+    expect(c.recommendation.status).toBe("prefer_a");
   });
 
-  it("时间范围、来源或筛选范围不同时不可比，口碑判断为证据不足", () => {
-    const ph = dataset.phones;
-    const alpha = ph.find((p) => p.id === "demo-alpha")!;
-    const beta = ph.find((p) => p.id === "demo-beta")!;
-    const base = { catalog: ph, reviews: dataset.reviews, analysis: dataset.analysis, audit: dataset.audit, asOf: dataset.meta.as_of };
-    const a90 = computeStats({ ...base, phone: alpha, window: "90d" });
-    const ball = computeStats({ ...base, phone: beta, window: "all" });
-    expect(compareSamples(a90, ball).reasons).toContain("两款使用了不同的样本筛选范围");
-    const shifted = { ...ball, window: "90d" as const, date_min: "2025-01-01", date_max: "2025-03-01" };
-    expect(compareSamples(a90, shifted).comparable).toBe(false);
-    const otherSource = { ...ball, window: "90d" as const, source_ids: ["src-other"] };
-    expect(compareSamples(a90, otherSource).reasons).toContain("两款评论来源不同");
-    const d = cmp("demo-delta", "demo-alpha", { prefs: ["battery"] }, "all");
-    expect(d.recommendation.verdicts[0].side).toBe("unknown");
-    expect(d.recommendation.status).toBe("insufficient");
+  it("没有任何评论时不生成口碑描述的数字", () => {
+    const c = cmp("apple-iphone-17-256", "xiaomi-17-256", { prefs: ["battery"] });
+    expect(c.recommendation.verdicts[0].claims[0].text).toContain("都还没有已分析的评论");
+    expect(c.recommendation.status).toBe("insufficient");
   });
 
-  it("reviewSignal 在不可比时不给方向", () => {
+  it("reviewSignal 永远不返回方向", () => {
     const c = cmp("demo-alpha", "demo-beta", { prefs: ["battery"] });
     const sig = reviewSignal(
       {
@@ -85,7 +79,7 @@ describe("口碑信号的保守规则", () => {
         hasReviews: { a: true, b: true },
         specs: { get: () => undefined },
         stats: { a: c.stats.a as never, b: c.stats.b as never },
-        comparability: { comparable: false, reasons: ["两款评论来源不同"] },
+        comparability: { comparable: true, reasons: [] },
         needs: c.needs,
         budget: { a: { kind: "unknown" }, b: { kind: "unknown" } },
         priceIds: { a: null, b: null },
@@ -93,13 +87,14 @@ describe("口碑信号的保守规则", () => {
       "battery",
     );
     expect(sig.side).toBe("unknown");
+    expect(sig.strength).toBeNull();
   });
 });
 
 describe("演示数据完整流程", () => {
-  it("轻便优先、续航其次：各有取舍，倾向更轻的一款，每条判断都有有效证据", () => {
+  it("轻便优先、续航其次：重量差异明确时推荐更轻的一款，续航评论不参与判断，每条判断都有有效证据", () => {
     const c = cmp("demo-alpha", "demo-beta", { prefs: ["handling", "battery"], budget: 6000 });
-    expect(c.recommendation.status).toBe("tradeoff");
+    expect(c.recommendation.status).toBe("prefer_a");
     expect(c.recommendation.lean).toBe("a");
     const claims = [...c.recommendation.summary, ...c.recommendation.reasons, ...c.recommendation.tradeoffs, ...c.recommendation.verdicts.flatMap((x) => x.claims)];
     for (const cl of claims) for (const id of cl.evidence) expect(c.evidence[id], id).toBeDefined();
@@ -108,7 +103,7 @@ describe("演示数据完整流程", () => {
   it("修改偏好后推荐理由随之变化", () => {
     const a = cmp("demo-alpha", "demo-beta", { prefs: ["handling", "battery"] });
     const b = cmp("demo-alpha", "demo-beta", { prefs: ["battery"] });
-    expect(b.recommendation.lean).toBe("b");
+    expect(b.recommendation.status).toBe("insufficient");
     expect(b.recommendation.summary[0].text).not.toBe(a.recommendation.summary[0].text);
   });
 
@@ -214,8 +209,9 @@ describe("价格口径", () => {
     expect(pickPrice([], ph("a"), 3999)?.price_type).toBe("user_reported");
   });
   it("推荐的一款超预算而另一款在预算内时降级为各有取舍", () => {
-    const c = cmp("demo-alpha", "demo-beta", { prefs: ["camera"], budget: 5000 });
+    const c = cmp("demo-alpha", "demo-beta", { prefs: ["handling"], budget: 5000 });
     expect(c.recommendation.status).toBe("tradeoff");
+    expect(c.recommendation.lean).toBe("a");
     expect(c.recommendation.tradeoffs[0].text).toContain("超出你的预算");
   });
 });

@@ -42,6 +42,29 @@ function Bars({ s, dim }: { s: StatsSummary; dim: Dimension }) {
   );
 }
 
+/** 定性要点：AI 概括的具体问题 + 原文摘录，最多三条，负面优先 */
+function IssueList({ c, statId, dim }: { c: Comparison; statId: string; dim: Dimension }) {
+  const stat = c.evidence[statId];
+  if (!stat || stat.kind !== "stat") return null;
+  const label = DIMENSION_LABEL[dim];
+  const order: Record<string, number> = { 负面: 0, 褒贬混合: 1, 正面: 2, 中性: 3 };
+  const items = stat.review_ids
+    .map((id) => c.evidence[`review:${id}`])
+    .flatMap((r) => (r && r.kind === "review" ? r.labels.filter((l) => l.dimension === label && l.issue).map((l) => ({ id: r.id, ...l })) : []))
+    .sort((x, y) => (order[x.sentiment] ?? 9) - (order[y.sentiment] ?? 9))
+    .slice(0, 3);
+  if (items.length === 0) return null;
+  return (
+    <ul className="note-list" style={{ marginTop: 8 }} aria-label={`${label}的具体反馈`}>
+      {items.map((it) => (
+        <li key={it.id}>
+          {it.sentiment} · {it.issue} <span className="muted">原文「{it.excerpt}」</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface Props {
   c: Comparison;
   onWindow: (w: SampleWindow) => void;
@@ -161,6 +184,7 @@ export function ReviewDims({ c, onWindow, updating }: Props) {
                           <EvidenceButton ids={[statId]} title={`${c[s].name} · ${DIMENSION_LABEL[dim]}`} label={`查看这 ${d.mentions} 条评论`} />
                         )}
                       </div>
+                      <IssueList c={c} statId={statId} dim={dim} />
                     </>
                   )}
                 </section>

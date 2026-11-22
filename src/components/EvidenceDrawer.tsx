@@ -219,6 +219,7 @@ function ReviewCard({ item }: { item: Extract<EvidenceItem, { kind: "review" }> 
           {item.labels.map((l, i) => (
             <span key={i} className="label-chip">
               {l.dimension} · {l.sentiment}
+              {l.issue ? ` · ${l.issue}` : ""}
             </span>
           ))}
         </div>

@@ -13,6 +13,8 @@ import type {
 } from "../types";
 import { LABEL_DIMENSIONS, SENTIMENTS } from "../types";
 
+export const MAX_ISSUE_CHARS = 30;
+
 export function normalizeText(s: string): string {
   return s.normalize("NFKC").replace(/[​-‍﻿]/g, "").replace(/\s+/g, " ").trim();
 }
@@ -138,7 +140,7 @@ export function cleanReviews(
 
 export interface LabelIssue {
   review_id: string;
-  problem: "unknown_review" | "bad_dimension" | "bad_sentiment" | "excerpt_not_found" | "duplicate_dimension";
+  problem: "unknown_review" | "bad_dimension" | "bad_sentiment" | "excerpt_not_found" | "duplicate_dimension" | "bad_issue";
   detail: string;
 }
 
@@ -174,18 +176,34 @@ export function validateLabels(
       issues.push({ review_id: id, problem: "excerpt_not_found", detail: `摘录不在原文中：${excerpt.slice(0, 40)}` });
       continue;
     }
+    // “具体问题”只是对摘录的简短概括：限制长度，且不能出现原文摘录里没有的数字
+    const issue = normalizeText(String(l.issue ?? ""));
+    if (issue) {
+      const nums = issue.match(/\d+(?:\.\d+)?/g) ?? [];
+      if ([...issue].length > MAX_ISSUE_CHARS) {
+        issues.push({ review_id: id, problem: "bad_issue", detail: `具体问题超过 ${MAX_ISSUE_CHARS} 字` });
+        continue;
+      }
+      if (nums.some((n) => !excerpt.includes(n))) {
+        issues.push({ review_id: id, problem: "bad_issue", detail: `具体问题含原文摘录没有的数字：${nums.join(",")}` });
+        continue;
+      }
+    }
     const k = `${id}::${l.dimension}`;
     if (seen.has(k)) {
       issues.push({ review_id: id, problem: "duplicate_dimension", detail: "同一评论同一维度重复标注，已合并" });
       continue;
     }
     seen.add(k);
+    // 展示时保留原文写法（如全角标点）；只有原文里找不到原样片段时才用规范化后的形式
+    const rawExcerpt = String(l.excerpt ?? "").trim();
     valid.push({
       review_id: id,
       dimension: l.dimension as LabelDimension,
       sentiment: l.sentiment as ReviewLabel["sentiment"],
-      excerpt,
+      excerpt: rawExcerpt && text.includes(rawExcerpt) ? rawExcerpt : excerpt,
       explanation: String(l.explanation ?? "").slice(0, 120),
+      ...(issue ? { issue } : {}),
     });
   }
   return { valid, issues };

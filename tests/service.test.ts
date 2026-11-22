@@ -102,7 +102,7 @@ describe("配额、限流与失败回退", () => {
     await explain(c1, { config: cfg(), adapter, store });
     const r = await explain(c2, { config: cfg(), adapter, store });
     expect(adapter.calls).toBe(2);
-    expect(r.mode === "ai" && r.explanation.status).toBe("tradeoff");
+    expect(r.mode === "ai" && r.explanation.status).toBe("insufficient");
     expect(adapter.calls).toBe(2);
   });
 
