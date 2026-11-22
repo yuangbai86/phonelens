@@ -345,8 +345,9 @@ function EvidenceList({ ids, evidence }: { ids: string[]; evidence: EvidenceMap 
             </h3>
             <p className={`ev-value${item.missing_reason ? " missing" : ""}`}>{item.value}</p>
             <div className="ev-meta">
-              <span>{item.data_kind === "demo" ? `记录日期：${item.verified_at ?? "—"}（演示夹具，未经核验）` : `核验日期：${item.verified_at ?? "尚未核验"}`}</span>
+              <span>{item.data_kind === "demo" ? `记录日期：${item.verified_at ?? "—"}（演示夹具，未经核验）` : item.verified_at ? `核对日期：${item.verified_at}${item.missing_reason ? `（${item.missing_reason}）` : ""}` : "核验日期：尚未核验"}</span>
               <SourceLine source={item.source} />
+              {item.note && <span>官网说明：{item.note}</span>}
               {item.caution && <span>注意：{item.caution}</span>}
               <span className="ev-id">{item.id}</span>
             </div>

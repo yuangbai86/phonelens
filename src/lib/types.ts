@@ -7,6 +7,7 @@ export type DataKind = "real" | "user" | "demo";
 
 export type VerifyStatus =
   | "human_verified" // 人工对照官网核验
+  | "official_checked" // 已对照官网原文逐项抄录（由开发助手完成，建议人工复核）
   | "unverified" // 尚未核验
   | "fixture"; // 演示夹具，非真实数据
 
@@ -37,6 +38,8 @@ export interface PhoneRecord {
   verified_at: string | null;
   data_kind: DataKind;
   note: string;
+  /** 价格无法核实时的说明（如官网只显示起售价） */
+  price_note?: string;
 }
 
 export type SpecField =

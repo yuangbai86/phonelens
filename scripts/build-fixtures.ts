@@ -26,15 +26,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(here, "../data/v1");
 mkdirSync(OUT, { recursive: true });
 
-const AS_OF = "2026-11-20";
+const AS_OF = "2026-11-20"; // 演示夹具的整理日期（九十天窗口以此计算）
+const CHECKED = "2026-11-22"; // 真实机型官网核对日期
 
 const meta: DataMeta = {
-  data_version: "v1-2026-11-20.3",
+  data_version: "v2-2026-11-22.1",
   label_version: "labels-demo-2026-11-20.2",
-  price_version: "prices-2026-11-20.1",
+  price_version: "prices-2026-11-22.1",
   as_of: AS_OF,
   notes:
-    "本版本只包含演示夹具与待核验的真实候选机型。官网在当前开发环境无法访问，真实机型参数、价格和评论均未录入。",
+    "iPhone 17 与小米 17 的参数已于 2026-11-22 对照官网原文逐项录入（由开发助手抄录，建议人工复核）；真实评论尚未收录。演示机型的参数、价格与评论均为虚构。",
 };
 
 const sources: SourceRecord[] = [
@@ -75,28 +76,52 @@ const sources: SourceRecord[] = [
     notes: "不是采集结果，不代表任何真实机型的口碑。",
   },
   {
-    id: "src-apple-cn-compare",
+    id: "src-apple-17-specs",
     kind: "official_spec",
-    name: "Apple 中国大陆官网 机型比较",
-    url: "https://www.apple.com.cn/iphone/compare/",
-    access_method: "人工核验（待进行）",
+    name: "Apple 中国大陆官网 iPhone 17 技术规格",
+    url: "https://www.apple.com.cn/iphone-17/specs/",
+    access_method: "直接读取官网页面原文，逐项抄录",
     allowed_storage: "仅保存结构化参数与来源链接",
     allowed_display: "summary_only",
-    collected_at: null,
-    verification: "unverified",
-    notes: "2026-11-20 开发环境无法访问该域名，尚未核验任何字段。",
+    collected_at: CHECKED,
+    verification: "official_checked",
+    notes: "官网未列出电池容量、运行内存和最大有线充电功率，相应字段保持缺失。",
+  },
+  {
+    id: "src-apple-17-buy",
+    kind: "official_price",
+    name: "Apple Store 在线商店 购买 iPhone 17",
+    url: "https://www.apple.com.cn/shop/buy-iphone/iphone-17",
+    access_method: "直接读取在线商店页面显示的标价",
+    allowed_storage: "仅保存价格、容量、日期与条件",
+    allowed_display: "summary_only",
+    collected_at: CHECKED,
+    verification: "official_checked",
+    notes: "256GB 各颜色均标 RMB 6,799，512GB 标 RMB 8,799。标价不含国家补贴与以旧换新折抵。",
   },
   {
     id: "src-mi-17-specs",
     kind: "official_spec",
-    name: "小米官网 小米 17 参数页",
+    name: "小米官网 Xiaomi 17 参数页",
     url: "https://www.mi.com/prod/xiaomi-17/specs",
-    access_method: "人工核验（待进行）",
+    access_method: "读取该页面加载的官方参数内容（mishop-pc.cnbj1.mi-fds.com 上的页面文件），逐项抄录",
     allowed_storage: "仅保存结构化参数与来源链接",
     allowed_display: "summary_only",
-    collected_at: null,
-    verification: "unverified",
-    notes: "2026-11-20 开发环境无法访问该域名，尚未核验任何字段。",
+    collected_at: CHECKED,
+    verification: "official_checked",
+    notes: "官网列出运行内存 12GB / 16GB 两档，但未写明 256GB 版本对应哪一档，运行内存保持缺失。重量、厚度为小米实验室测试数据。",
+  },
+  {
+    id: "src-mi-17-product",
+    kind: "official_price",
+    name: "小米官网 Xiaomi 17 商品页",
+    url: "https://www.mi.com/shop/buy/detail?product_id=21931",
+    access_method: "读取商品页内嵌的商品信息",
+    allowed_storage: "仅保存价格、日期与条件",
+    allowed_display: "summary_only",
+    collected_at: CHECKED,
+    verification: "official_checked",
+    notes: "商品页显示多价格商品的起始价 5099 元（price 与 market_price 均为 5099），页面未注明对应哪个内存与存储组合；各配置售价接口未能读取，因此不记录 256GB 价格。",
   },
   {
     id: "src-vivo-x200-param",
@@ -186,23 +211,24 @@ const phones: PhoneRecord[] = [
     region: "中国大陆版",
     storage: "256GB",
     ram: null,
-    sale_status: "unverified",
-    verified_at: null,
+    sale_status: "on_sale",
+    verified_at: CHECKED,
     data_kind: "real",
-    note: "候选机型，型号、在售状态与全部参数待人工核验。",
+    note: "Apple Store 在线商店有售（2026-11-22 读取），参数来自 Apple 中国大陆官网技术规格页。",
   },
   {
     id: "xiaomi-17-256",
     brand: "小米",
-    model: "17",
-    aliases: ["xiaomi 17", "mi 17", "小米17"],
+    model: "Xiaomi 17",
+    aliases: ["xiaomi 17", "mi 17", "小米17", "小米 17"],
     region: "中国大陆版",
     storage: "256GB",
     ram: null,
     sale_status: "unverified",
-    verified_at: null,
+    verified_at: CHECKED,
     data_kind: "real",
-    note: "候选机型，在售状态、存储版本与全部参数待人工核验。",
+    note: "参数来自小米官网参数页（2026-11-22 读取）。商品页可购买，但 256GB 配置的售价与库存未能核实。",
+    price_note: "官网商品页只显示起售价 ¥5,099，未注明配置",
   },
   {
     id: "vivo-x200-256",
@@ -241,7 +267,15 @@ const ALL_FIELDS: SpecField[] = [
   "rear_camera_count", "main_camera_mp", "telephoto", "front_camera_mp",
 ];
 
-function specs(phoneId: string, input: SpecInput, kind: "demo" | "real", sourceId: string, missing: Partial<Record<SpecField, "官网未列出" | "尚未核验">> = {}): SpecRecord[] {
+function specs(
+  phoneId: string,
+  input: SpecInput,
+  kind: "demo" | "real",
+  sourceId: string,
+  missing: Partial<Record<SpecField, "官网未列出" | "尚未核验">> = {},
+  notes: Partial<Record<SpecField, string>> = {},
+  checkedAt: string | null = null,
+): SpecRecord[] {
   return ALL_FIELDS.map((field) => {
     const has = Object.prototype.hasOwnProperty.call(input, field) && input[field] !== null && input[field] !== undefined;
     return {
@@ -251,9 +285,11 @@ function specs(phoneId: string, input: SpecInput, kind: "demo" | "real", sourceI
       value: has ? (input[field] as string | number) : null,
       unit: UNITS[field] ?? null,
       source_id: sourceId,
-      verified_at: has && kind === "demo" ? AS_OF : null,
+      // 真实机型：有值或确认“官网未列出”的字段都记录核对日期；演示夹具只给有值字段写日期
+      verified_at: kind === "demo" ? (has ? AS_OF : null) : checkedAt,
       missing_reason: has ? null : missing[field] ?? "尚未核验",
       data_kind: kind,
+      ...(notes[field] ? { note: notes[field] } : {}),
     };
   });
 }
@@ -280,12 +316,73 @@ const specRecords: SpecRecord[] = [
     ip_rating: "IP69", display_size_in: 6.82, display_refresh_hz: 120, battery_mah: 6000, wired_charging_w: 120,
     wireless_charging_w: 80, rear_camera_count: 3, main_camera_mp: 50, telephoto: "3.7 倍潜望式长焦", front_camera_mp: 50,
   }, "demo", "src-demo-spec"),
-  ...specs("apple-iphone-17-256", {}, "real", "src-apple-cn-compare"),
-  ...specs("xiaomi-17-256", {}, "real", "src-mi-17-specs"),
+  // 以下两款为真实数据：数值逐项抄自官网原文（2026-11-22），官网未写明的字段保持缺失
+  ...specs(
+    "apple-iphone-17-256",
+    {
+      chip: "A19", os: "iOS 27", weight_g: 177, height_mm: 149.6, width_mm: 71.5, thickness_mm: 7.95, ip_rating: "IP68",
+      display_size_in: 6.3, display_refresh_hz: 120, wireless_charging_w: 15, rear_camera_count: 2, main_camera_mp: 48,
+      telephoto: "无独立长焦", front_camera_mp: 18,
+    },
+    "real",
+    "src-apple-17-specs",
+    { ram_gb: "官网未列出", battery_mah: "官网未列出", wired_charging_w: "官网未列出" },
+    {
+      os: "官网“包装内容”写明“装有 iOS 27 的 iPhone”",
+      battery_mah: "官网未标注容量；标注视频播放最长可达 30 小时，流媒体视频播放最长可达 27 小时",
+      wired_charging_w: "官网未标注最大功率；标注 20 分钟最多可充至 50% 电量，需使用 40 瓦或更大功率的电源适配器（另外有售）",
+      wireless_charging_w: "MagSafe 无线充电与 Qi2 无线充电，功率最高可达 15 瓦",
+      display_size_in: "6.3 英寸（对角线）OLED，2622 x 1206 像素；按标准矩形测量为 6.27 英寸",
+      display_refresh_hz: "ProMotion 自适应刷新率技术，最高可达 120Hz",
+      rear_camera_count: "4800 万像素融合式主摄 + 4800 万像素融合式超广角",
+      telephoto: "官网写明主摄“同时支持 1200 万像素光学品质的 2 倍长焦功能”，没有单独的长焦镜头",
+      weight_g: "尺寸和重量依配置和制造工艺的不同可能有所差异",
+      ip_rating: "IEC 60529 标准下 IP68（最深 6 米水下最长 30 分钟）",
+    },
+    CHECKED,
+  ),
+  ...specs(
+    "xiaomi-17-256",
+    {
+      chip: "第五代骁龙 8 至尊版", os: "小米澎湃OS 3", weight_g: 191, height_mm: 151.1, width_mm: 71.8, thickness_mm: 8.06,
+      ip_rating: "IP68", display_size_in: 6.3, display_refresh_hz: 120, battery_mah: 7000, wired_charging_w: 100,
+      wireless_charging_w: 50, rear_camera_count: 3, main_camera_mp: 50, telephoto: "60mm 浮动长焦", front_camera_mp: 50,
+    },
+    "real",
+    "src-mi-17-specs",
+    { ram_gb: "尚未核验" },
+    {
+      ram_gb: "官网列出 12GB / 16GB 两档运行内存，未写明 256GB 版本对应哪一档",
+      weight_g: "小米实验室测试数据",
+      thickness_mm: "不含屏幕凸起，小米实验室测试数据",
+      display_size_in: "6.3 英寸 OLED 柔性直屏，2656 x 1220",
+      display_refresh_hz: "显示帧率最高 120Hz",
+      battery_mah: "官网写作“7000mAh 小米金沙江电池”，未注明典型值或额定值",
+      wired_charging_w: "100W 小米澎湃有线秒充，小米实验室数据",
+      wireless_charging_w: "50W 小米澎湃无线秒充，小米实验室数据",
+      rear_camera_count: "5000 万主摄 + 5000 万徕卡浮动长焦 + 5000 万徕卡超广角",
+      telephoto: "5000 万像素，等效 60mm 焦距，10cm 至无限远对焦",
+      ip_rating: "IEC 60529 标准下 IP68（水深 4 米、30 分钟）",
+    },
+    CHECKED,
+  ),
   ...specs("vivo-x200-256", {}, "real", "src-vivo-x200-param"),
 ];
 
 const prices: PriceRecord[] = [
+  {
+    id: "price:apple-iphone-17-256:current",
+    phone_id: "apple-iphone-17-256",
+    storage: "256GB",
+    amount: 6799,
+    currency: "CNY",
+    price_type: "official_current",
+    channel: "Apple Store 在线商店",
+    conditions: "在线商店标价；不含国家补贴、以旧换新折抵等优惠",
+    recorded_at: CHECKED,
+    source_id: "src-apple-17-buy",
+    data_kind: "real",
+  },
   { id: "price:demo-alpha:256", phone_id: "demo-alpha", storage: "256GB", amount: 5999, currency: "CNY", price_type: "official_current", channel: "演示官网", conditions: "不含以旧换新与平台补贴", recorded_at: "2026-11-18", source_id: "src-demo-price", data_kind: "demo" },
   { id: "price:demo-beta:256", phone_id: "demo-beta", storage: "256GB", amount: 4799, currency: "CNY", price_type: "official_current", channel: "演示官网", conditions: "不含以旧换新与平台补贴", recorded_at: "2026-11-18", source_id: "src-demo-price", data_kind: "demo" },
   { id: "price:demo-gamma:256", phone_id: "demo-gamma", storage: "256GB", amount: 3299, currency: "CNY", price_type: "official_msrp", channel: "演示官网（发布会建议零售价）", conditions: null, recorded_at: "2026-09-01", source_id: "src-demo-price", data_kind: "demo" },
@@ -348,4 +445,4 @@ write("prices.json", prices);
 write("reviews.json", reviews);
 write("analysis.json", analysis);
 write("audit.json", audit);
-console.log(`已生成 ${phones.length} 款机型、${specRecords.length} 条参数记录、${prices.length} 条价格、${reviews.length} 条评论（全部为演示夹具）。`);
+console.log(`已生成 ${phones.length} 款机型、${specRecords.length} 条参数记录、${prices.length} 条价格、${reviews.length} 条评论（评论均为演示夹具）。`);

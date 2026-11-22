@@ -25,6 +25,7 @@ export type EvidenceItem =
       source: EvidenceSource | null;
       data_kind: DataKind;
       caution?: string;
+      note?: string;
     }
   | {
       id: string;
@@ -76,7 +77,8 @@ export type EvidenceMap = Record<string, EvidenceItem>;
 function src(ds: Dataset, id: string | null): EvidenceSource | null {
   const s = getSource(ds, id);
   if (!s) return null;
-  const verification = s.verification === "fixture" ? "演示夹具" : s.verification === "human_verified" ? "已人工核验" : "尚未核验";
+  const verification =
+    s.verification === "fixture" ? "演示夹具" : s.verification === "human_verified" ? "已人工核验" : s.verification === "official_checked" ? "已对照官网原文，待人工复核" : "尚未核验";
   return { name: s.name, url: s.url, verification };
 }
 
@@ -98,6 +100,7 @@ export function specEvidence(ds: Dataset, s: SpecRecord, phoneName: string): Evi
     source: src(ds, s.source_id),
     data_kind: s.data_kind,
     caution: def.caution,
+    note: s.note,
   };
 }
 

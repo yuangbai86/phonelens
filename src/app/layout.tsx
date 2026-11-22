@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link className="wordmark" href="/">
                 PhoneLens
               </Link>
-              <SiteNav demo={DEMO} />
+              <SiteNav />
             </div>
           </header>
           <main id="main" tabIndex={-1}>

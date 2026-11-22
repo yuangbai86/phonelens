@@ -168,6 +168,13 @@ export function ResultView({ initial, aiInitial, sourceNames }: Props) {
         {c.a.name} 与 {c.b.name} 对比
       </h1>
 
+      {c.demo && (
+        <p style={{ textAlign: "center", marginTop: 20 }}>
+          <Link className="demo-pill" href="/data#demo" title="了解演示数据">
+            演示模式 · 数据为虚构示例
+          </Link>
+        </p>
+      )}
       <section className="product-head" aria-label="对比的两款手机">
         {(["a", "b"] as const).map((s, i) => {
           const pr = priceText(c, s);
@@ -186,7 +193,7 @@ export function ResultView({ initial, aiInitial, sourceNames }: Props) {
                     {pr.amount}
                   </>
                 ) : (
-                  <span className="muted">暂无价格</span>
+                  <span className="muted">{c[s].price_note ? `暂无 ${c[s].storage} 价格 · ${c[s].price_note}` : "暂无价格"}</span>
                 )}
               </p>
             </div>

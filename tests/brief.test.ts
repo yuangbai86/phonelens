@@ -19,7 +19,9 @@ const CASES: [string, string, Preference[], number | null][] = [
   ["demo-alpha", "demo-beta", ["camera"], 5000],
   ["demo-alpha", "demo-beta", [], null],
   ["demo-alpha", "demo-gamma", ["gaming"], null],
-  ["demo-alpha", "xiaomi-17-256", ["battery"], null],
+  ["demo-alpha", "vivo-x200-256", ["battery"], null],
+  ["apple-iphone-17-256", "xiaomi-17-256", ["handling", "battery"], 7000],
+  ["apple-iphone-17-256", "xiaomi-17-256", [], null],
   ["demo-delta", "demo-alpha", ["handling"], null],
   ["demo-beta", "demo-epsilon", ["ecosystem", "camera"], null],
 ];
@@ -59,8 +61,8 @@ describe("结果摘要", () => {
     const br = buildBrief(cmp("demo-alpha", "demo-gamma", ["gaming"]));
     expect(br.eyebrow).toBe("证据不足");
     expect(br.missing).toContain("芯片");
-    const none = buildBrief(cmp("demo-alpha", "xiaomi-17-256", ["battery"]));
-    expect(none.headline.text).toContain("小米 17");
+    const none = buildBrief(cmp("demo-alpha", "vivo-x200-256", ["battery"]));
+    expect(none.headline.text).toContain("X200");
     expect(none.tradeoff).toBeNull();
   });
 
@@ -85,9 +87,10 @@ describe("关键差异", () => {
   });
 
   it("缺失值如实显示，不补齐", () => {
-    const rows = keyRows(cmp("demo-alpha", "xiaomi-17-256", ["battery"]));
+    const rows = keyRows(cmp("apple-iphone-17-256", "xiaomi-17-256", ["battery"]));
     const cap = rows.find((r) => r.label === "电池容量")!;
-    expect(cap.b).toEqual({ text: "尚未核验", missing: true });
+    expect(cap.a).toEqual({ text: "官网未列出", missing: true });
+    expect(cap.b).toEqual({ text: "7000 mAh", missing: false });
     expect(rows.find((r) => r.kind === "price")?.b).toEqual({ text: "暂无价格", missing: true });
   });
 });

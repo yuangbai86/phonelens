@@ -12,6 +12,7 @@ import { IconSwap } from "./Icons";
 import { useToast } from "./Toast";
 
 const KEY = "pl:form:v2";
+const DEFAULT_PAIR = ["apple-iphone-17-256", "xiaomi-17-256"] as const;
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export interface FormState {
@@ -71,8 +72,8 @@ function Picker({
 }) {
   const id = useId();
   const sel = catalog.find((p) => p.id === value) ?? null;
-  const demo = catalog.filter((p) => p.data_kind === "demo");
-  const real = catalog.filter((p) => p.data_kind !== "demo");
+  // 首页只列出有已核对数据的真实机型；虚构机型通过“示例”入口单独查看
+  const real = catalog.filter((p) => p.data_kind !== "demo" && (p.has_specs || p.review_count > 0));
   const opt = (p: CatalogItem) => (
     <option key={p.id} value={p.id} disabled={p.id === other}>
       {displayName(p)}
@@ -96,8 +97,7 @@ function Picker({
           onChange={(e) => onChange(e.target.value || null)}
         >
           <option value="">选择机型</option>
-          <optgroup label="演示机型（虚构）">{demo.map(opt)}</optgroup>
-          <optgroup label="真实机型（数据待核验）">{real.map(opt)}</optgroup>
+          {real.map(opt)}
         </select>
         <svg className="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -109,6 +109,7 @@ function Picker({
             <>
               {sel.region.replace("（演示）", "")} · {sel.storage}
               {!sel.has_specs && sel.review_count === 0 && <span className="flag"> · 数据待收录</span>}
+              {sel.has_specs && sel.review_count === 0 && <span> · 官网参数</span>}
             </>
           ) : (
             " "
@@ -139,10 +140,13 @@ export function HomeForm({ catalog }: { catalog: CatalogItem[] }) {
   // 返回首页时恢复已填写内容（绘制前完成），并跳过入场动画
   useIsoLayoutEffect(() => {
     const saved = loadSavedForm();
-    if (saved) {
-      const ok = (id: string | null) => (id && catalog.some((p) => p.id === id) ? id : null);
+    const ok = (id: string | null) => (id && catalog.some((p) => p.id === id && p.data_kind !== "demo") ? id : null);
+    if (saved && (ok(saved.a) || ok(saved.b))) {
       setS({ ...saved, a: ok(saved.a), b: ok(saved.b) });
       if (saved.budget) more.setOpen(true);
+    } else {
+      // 默认对比两款已核对官网参数的真实机型
+      setS({ ...(saved ?? EMPTY), a: ok(DEFAULT_PAIR[0]), b: ok(DEFAULT_PAIR[1]) });
     }
     setRestored(true);
     try {
@@ -251,7 +255,7 @@ export function HomeForm({ catalog }: { catalog: CatalogItem[] }) {
           </span>
         </button>
         <Link className="link-btn" href={`/compare/?${toSearch(EXAMPLE)}`}>
-          看一个示例 ›
+          看虚构示例（演示数据，含评论统计） ›
         </Link>
       </div>
     </form>

@@ -25,6 +25,7 @@ export interface PhoneSide {
   sale_status: PhoneRecord["sale_status"];
   data_kind: DataKind;
   price: (PriceRecord & { evidence_id: string }) | null;
+  price_note: string | null;
   state: DataState;
 }
 
@@ -199,6 +200,7 @@ export function buildComparison(
     sale_status: phones[s].sale_status,
     data_kind: phones[s].data_kind,
     price: prices[s] ? { ...prices[s]!, evidence_id: prices[s]!.id } : null,
+    price_note: phones[s].price_note ?? null,
     state: state(s),
   });
 

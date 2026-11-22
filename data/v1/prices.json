@@ -1,5 +1,18 @@
 [
   {
+    "id": "price:apple-iphone-17-256:current",
+    "phone_id": "apple-iphone-17-256",
+    "storage": "256GB",
+    "amount": 6799,
+    "currency": "CNY",
+    "price_type": "official_current",
+    "channel": "Apple Store 在线商店",
+    "conditions": "在线商店标价；不含国家补贴、以旧换新折抵等优惠",
+    "recorded_at": "2026-11-22",
+    "source_id": "src-apple-17-buy",
+    "data_kind": "real"
+  },
+  {
     "id": "price:demo-alpha:256",
     "phone_id": "demo-alpha",
     "storage": "256GB",

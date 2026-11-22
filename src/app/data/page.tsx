@@ -8,7 +8,7 @@ import { PRICE_GAP_THRESHOLD } from "@/lib/rules";
 
 export const metadata: Metadata = { title: "数据与方法 · PhoneLens" };
 
-const VERIFY: Record<string, string> = { fixture: "演示夹具", unverified: "尚未核验", human_verified: "已人工核验" };
+const VERIFY: Record<string, string> = { fixture: "演示夹具", unverified: "尚未核验", human_verified: "已人工核验", official_checked: "已对照官网原文（2026-11-22），待人工复核" };
 
 export default function DataPage() {
   const items = catalog(dataset);
@@ -23,12 +23,22 @@ export default function DataPage() {
 
       <section id="demo" className="panel enter" style={{ ["--i" as string]: 2 }} aria-labelledby="demo-h">
         <h2 id="demo-h" style={{ fontSize: 19, marginBottom: 8 }}>
-          演示模式
+          数据现状
         </h2>
-        <p className="muted">
-          Alpha、Beta、Gamma、Delta、Epsilon Pro 是虚构的演示机型，参数、价格与 84 条评论都由开发者编写，只用于展示比较、统计和证据流程，不代表任何真实产品。
-          {" "}{dataset.meta.notes}
-        </p>
+        <ul className="note-list" style={{ marginTop: 0, fontSize: 14.5 }}>
+          <li>
+            <strong>真实机型：</strong>iPhone 17 与 Xiaomi 17（各 256GB）的参数于 2026-11-22 对照 Apple 中国大陆官网与小米官网原文逐项录入，每项可查来源与核对日期；官网没有公开的字段（如 iPhone 的电池容量、运行内存、最大有线功率）保持缺失。录入由开发助手完成，建议人工复核。
+          </li>
+          <li>
+            <strong>价格：</strong>iPhone 17 256GB 记录为 Apple Store 在线商店标价 ¥6,799（不含补贴与折抵）。Xiaomi 17 官网商品页只显示起售价 ¥5,099、未注明配置，因此不记录 256GB 价格。
+          </li>
+          <li>
+            <strong>评论：</strong>两款真实机型都还没有收录评论，口碑相关的判断显示为“证据不足”。
+          </li>
+          <li>
+            <strong>演示模式：</strong>Alpha、Beta、Gamma、Delta、Epsilon Pro 是虚构机型，参数、价格与 84 条评论都由开发者编写，只用于展示评论统计与证据流程，从首页的“虚构示例”进入。
+          </li>
+        </ul>
       </section>
 
       <section id="method" className="panel" aria-labelledby="method-h">

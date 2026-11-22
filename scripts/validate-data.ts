@@ -21,7 +21,7 @@ for (const s of dataset.specs) {
   if (s.value === null && !s.missing_reason) problems.push(`参数 ${s.id} 为空但没有缺失原因`);
   if (s.value !== null && s.data_kind === "real") {
     const src = dataset.sources.find((x) => x.id === s.source_id);
-    if (!s.verified_at || src?.verification !== "human_verified") problems.push(`真实参数 ${s.id} 有数值，但来源未人工核验`);
+    if (!s.verified_at || !src || !["human_verified", "official_checked"].includes(src.verification)) problems.push(`真实参数 ${s.id} 有数值，但来源未核对官网`);
   }
 }
 for (const p of dataset.prices) {

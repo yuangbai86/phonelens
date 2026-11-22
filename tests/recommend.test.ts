@@ -132,19 +132,53 @@ describe("演示数据完整流程", () => {
   });
 
   it("两者都没有数据：证据不足，并提供下一步", () => {
-    const c = cmp("demo-alpha", "xiaomi-17-256", { prefs: ["battery"] });
+    const c = cmp("demo-alpha", "vivo-x200-256", { prefs: ["battery"] });
     expect(c.b.state).toBe("none");
     expect(c.recommendation.status).toBe("insufficient");
     expect(c.recommendation.summary.map((s) => s.text).join("")).toContain("导入");
   });
 
-  it("真实候选机型没有任何被补齐的参数值", () => {
-    for (const s of dataset.specs.filter((x) => x.data_kind === "real")) {
-      expect(s.value).toBeNull();
-      expect(s.missing_reason).not.toBeNull();
+  it("真实机型的每个参数值都有官网来源与核对日期，缺失项保留原因", () => {
+    const real = dataset.specs.filter((x) => x.data_kind === "real");
+    for (const s of real) {
+      if (s.value === null) {
+        expect(s.missing_reason, s.id).not.toBeNull();
+        continue;
+      }
+      const src = dataset.sources.find((x) => x.id === s.source_id);
+      expect(src?.kind, s.id).toBe("official_spec");
+      expect(["official_checked", "human_verified"]).toContain(src?.verification);
+      expect(src?.url).toMatch(/^https:\/\/www\.(apple\.com\.cn|mi\.com)\//);
+      expect(s.verified_at, s.id).toBe("2026-11-22");
     }
-    expect(dataset.prices.filter((p) => p.data_kind === "real")).toHaveLength(0);
+    // 官网未公开的字段保持缺失，不填数字
+    const v = (id: string) => real.find((x) => x.id === id);
+    expect(v("spec:apple-iphone-17-256:battery_mah")).toMatchObject({ value: null, missing_reason: "官网未列出" });
+    expect(v("spec:apple-iphone-17-256:ram_gb")).toMatchObject({ value: null, missing_reason: "官网未列出" });
+    expect(v("spec:apple-iphone-17-256:wired_charging_w")).toMatchObject({ value: null, missing_reason: "官网未列出" });
+    expect(v("spec:xiaomi-17-256:ram_gb")?.value).toBeNull();
+    // 未收录的机型仍然全部为空
+    expect(dataset.specs.filter((x) => x.phone_id === "vivo-x200-256" && x.value !== null)).toHaveLength(0);
+    // 价格：只有核对到的 iPhone 17 256GB 在线商店标价；小米 17 256GB 价格未核实，不记录
+    const realPrices = dataset.prices.filter((p) => p.data_kind === "real");
+    expect(realPrices).toHaveLength(1);
+    expect(realPrices[0]).toMatchObject({ phone_id: "apple-iphone-17-256", storage: "256GB", amount: 6799, price_type: "official_current" });
+    // 真实评论尚未收录
     expect(dataset.reviews.filter((r) => r.data_kind === "real")).toHaveLength(0);
+  });
+
+  it("iPhone 17 对比小米 17：只用官网参数，不依据评论判断", () => {
+    const c = cmp("apple-iphone-17-256", "xiaomi-17-256", { prefs: ["handling", "camera"] });
+    expect(c.a.state).toBe("specs_only");
+    expect(c.b.state).toBe("specs_only");
+    const w = c.recommendation.verdicts[0];
+    expect(w.claims[0].text).toContain("A 177 g，B 191 g");
+    expect(w.side).toBe("a");
+    expect(c.recommendation.verdicts[1].side).toBe("unknown");
+    expect(c.recommendation.verdicts[1].claims.map((x) => x.text).join("")).toContain("长焦配置");
+    expect(c.b.price).toBeNull();
+    expect(c.b.price_note).toContain("起售价");
+    expect(c.warnings.map((x) => x.code)).toContain("price_missing");
   });
 
   it("同一机型或未知机型返回错误，不做相似名称替换", () => {

@@ -225,8 +225,8 @@ function cameraVerdict(input: EngineInput): Verdict {
   const ta = input.specs.get("a", "telephoto");
   const tb = input.specs.get("b", "telephoto");
   if (ta?.value && tb?.value) {
-    const noA = String(ta.value) === "无";
-    const noB = String(tb.value) === "无";
+    const noA = String(ta.value).startsWith("无");
+    const noB = String(tb.value).startsWith("无");
     if (noA !== noB) {
       claims.push({
         text: `长焦配置：A ${ta.value}，B ${tb.value}。这是功能差异（远距离拍摄），不代表整体成像更好。`,

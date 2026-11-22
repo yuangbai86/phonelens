@@ -93,27 +93,29 @@
     "region": "中国大陆版",
     "storage": "256GB",
     "ram": null,
-    "sale_status": "unverified",
-    "verified_at": null,
+    "sale_status": "on_sale",
+    "verified_at": "2026-11-22",
     "data_kind": "real",
-    "note": "候选机型，型号、在售状态与全部参数待人工核验。"
+    "note": "Apple Store 在线商店有售（2026-11-22 读取），参数来自 Apple 中国大陆官网技术规格页。"
   },
   {
     "id": "xiaomi-17-256",
     "brand": "小米",
-    "model": "17",
+    "model": "Xiaomi 17",
     "aliases": [
       "xiaomi 17",
       "mi 17",
-      "小米17"
+      "小米17",
+      "小米 17"
     ],
     "region": "中国大陆版",
     "storage": "256GB",
     "ram": null,
     "sale_status": "unverified",
-    "verified_at": null,
+    "verified_at": "2026-11-22",
     "data_kind": "real",
-    "note": "候选机型，在售状态、存储版本与全部参数待人工核验。"
+    "note": "参数来自小米官网参数页（2026-11-22 读取）。商品页可购买，但 256GB 配置的售价与库存未能核实。",
+    "price_note": "官网商品页只显示起售价 ¥5,099，未注明配置"
   },
   {
     "id": "vivo-x200-256",
